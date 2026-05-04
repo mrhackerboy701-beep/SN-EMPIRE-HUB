@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'mrhackerboy701@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Validation Helpers
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'status', 'subscriptionStatus']) &&
+             data.email is string && data.email.size() <= 200 &&
+             data.role in ['user', 'admin'] &&
+             data.status in ['active', 'blocked'] &&
+             data.subscriptionStatus in ['inactive', 'active'];
+    }
+
+    function isValidPlan(data) {
+      return data.keys().hasAll(['name', 'price', 'duration']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.duration is string && data.duration.size() <= 50;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['userId', 'planId', 'amount', 'status']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.planId is string && data.planId.size() <= 128 &&
+             data.amount is number && data.amount >= 0 &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isValidSetting(data) {
+      return data.keys().hasAll(['value']) &&
+             data.value is string && data.value.size() <= 2000;
+    }
+
+    // Collections
+
+    // Users
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && 
+                    // users cannot self-assign admin role on creation
+                    incoming().role == 'user' && 
+                    incoming().status == 'active' && 
+                    incoming().subscriptionStatus == 'inactive';
+                    
+      allow update: if (isValidId(userId) && isValidUser(incoming()) && (
+        isAdmin() || 
+        (isOwner(userId) && 
+         // User can only update name, mobile, etc., not role or core balance
+         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'mobile']) &&
+         incoming().role == existing().role &&
+         incoming().status == existing().status &&
+         incoming().subscriptionStatus == existing().subscriptionStatus)
+      ));
+      
+      allow delete: if isAdmin();
+    }
+
+    // Plans
+    match /plans/{planId} {
+      allow read: if true; // Publicly readable
+      allow create, update, delete: if isAdmin() && isValidId(planId) && isValidPlan(incoming());
+    }
+
+    // Payments
+    match /payments/{paymentId} {
+      allow get: if isOwner(existing().userId) || isAdmin();
+      // Enforce query limits
+      allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      allow create: if isSignedIn() && isValidId(paymentId) && isValidPayment(incoming()) &&
+                    // user can only create payments for themselves
+                    incoming().userId == request.auth.uid &&
+                    // must be pending initially
+                    incoming().status == 'pending';
+                    
+      allow update: if (isValidId(paymentId) && isValidPayment(incoming()) && (
+        isAdmin() ||
+        (isOwner(existing().userId) && 
+         // user can only upload screenshot, cannot change status or amount
+         incoming().diff(existing()).affectedKeys().hasOnly(['screenshotUrl']) &&
+         existing().status == 'pending' && incoming().status == 'pending')
+      ));
+      
+      allow delete: if isAdmin();
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if true; // Publicly readable settings
+      allow create, update, delete: if isAdmin() && isValidId(settingId) && isValidSetting(incoming());
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and subscription status",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "status": { "type": "string", "enum": ["active", "blocked"] },
+        "subscriptionStatus": { "type": "string", "enum": ["inactive", "active"] },
+        "totalPaid": { "type": "number" },
+        "referralCode": { "type": "string" },
+        "referrerId": { "type": "string" },
+        "walletBalance": { "type": "number" },
+        "mobile": { "type": "string" },
+        "joinDate": { "type": "number" }
+      },
+      "required": ["email", "role", "status", "subscriptionStatus"]
+    },
+    "Plan": {
+      "title": "Subscription Plan",
+      "description": "Available subscription plans",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "duration": { "type": "string" },
+        "features": { "type": "string" },
+        "badge": { "type": "string" }
+      },
+      "required": ["name", "price", "duration"]
+    },
+    "Payment": {
+      "title": "Payment Record",
+      "description": "User payments and manual screenshot verification requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "planId": { "type": "string" },
+        "amount": { "type": "number" },
+        "screenshotUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "planId", "amount", "status"]
+    },
+    "Setting": {
+      "title": "App Setting",
+      "description": "Global application configuration",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile documents"
+    },
+    "/plans/{planId}": {
+      "schema": { "$ref": "#/entities/Plan" },
+      "description": "Available subscription plans"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Records of user payments"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "Global application settings (e.g. upiQrCode, themeColor)"
+    }
+  }
+}
