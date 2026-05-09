@@ -399,6 +399,10 @@ async function startServer() {
   } else {
     app.use(express.static(path.join(process.cwd(), 'dist')));
     app.get('*', (req, res) => {
+      if (req.path.startsWith('/assets/') || req.path.match(/\.(js|css|svg|png|jpg|jpeg|gif|ico)$/)) {
+        res.status(404).send('Not found');
+        return;
+      }
       res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
     });
   }

@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
+import * as React from 'react';
 import { useAuthStore } from '../lib/store';
 import { GlassCard, Button, Input } from '../components/ui';
-import { Users, IndianRupee, Activity, CheckCircle2, XCircle, Check, X, ShieldAlert, Plus, Trash2 } from 'lucide-react';
+import { Users, IndianRupee, Activity, CheckCircle2, XCircle, Check, X, ShieldAlert, Plus, Trash2, Search } from 'lucide-react';
 
 // Admin Components
 export function AdminDashboard() {
   const { token } = useAuthStore();
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = React.useState<any>({});
 
-  useEffect(() => {
-    fetch('/api/admin/stats', {
+  React.useEffect(() => {
+    apiFetch('/api/admin/stats', {
       headers: { Authorization: `Bearer ${token}` }
     }).then(res => res.json()).then(data => setStats(data));
   }, []);
@@ -47,19 +48,26 @@ export function AdminDashboard() {
 
 export function AdminUsers() {
   const { token } = useAuthStore();
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = React.useState<any[]>([]);
+  const [search, setSearch] = React.useState('');
 
   const fetchUsers = () => {
-    fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => setUsers(data));
   };
   
-  useEffect(() => fetchUsers(), []);
+  React.useEffect(() => fetchUsers(), []);
+
+  const filteredUsers = users.filter(u => 
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.mobile?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const toggleUserStatus = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
-    await fetch(`/api/admin/users/${id}/status`, {
+    await apiFetch(`/api/admin/users/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status: newStatus })
@@ -73,6 +81,15 @@ export function AdminUsers() {
         <div>
           <h1 className="text-3xl font-bold mb-2">User Management</h1>
           <p className="text-zinc-500">View and manage all registered users.</p>
+        </div>
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+          <Input 
+            className="pl-10" 
+            placeholder="Search name, email or mobile..." 
+            value={search}
+            onChange={(e: any) => setSearch(e.target.value)}
+          />
         </div>
       </header>
 
@@ -92,7 +109,7 @@ export function AdminUsers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {users.map(u => (
+              {filteredUsers.map(u => (
                 <tr key={u.id} className="hover:bg-zinc-50/30 dark:hover:bg-zinc-800/30 transition-colors">
                   <td className="p-4 font-medium">{u.name}</td>
                   <td className="p-4 text-sm text-zinc-500">
@@ -123,8 +140,8 @@ export function AdminUsers() {
                   </td>
                 </tr>
               ))}
-              {users.length === 0 && (
-                <tr><td colSpan={8} className="p-8 text-center text-zinc-500">No users found.</td></tr>
+              {filteredUsers.length === 0 && (
+                <tr><td colSpan={8} className="p-8 text-center text-zinc-500">No users found matching your search.</td></tr>
               )}
             </tbody>
           </table>
@@ -136,18 +153,18 @@ export function AdminUsers() {
 
 export function AdminPayments() {
   const { token } = useAuthStore();
-  const [payments, setPayments] = useState<any[]>([]);
+  const [payments, setPayments] = React.useState<any[]>([]);
 
   const fetchPayments = () => {
-    fetch('/api/admin/payments', { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch('/api/admin/payments', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => setPayments(data));
   };
   
-  useEffect(() => fetchPayments(), []);
+  React.useEffect(() => fetchPayments(), []);
 
   const handleAction = async (id: number, status: string) => {
-    await fetch(`/api/admin/payments/${id}`, {
+    await apiFetch(`/api/admin/payments/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status })
@@ -218,25 +235,31 @@ export function AdminPayments() {
 
 export function AdminSettings() {
   const { token } = useAuthStore();
-  const [settings, setSettings] = useState<any>({ serviceShopping: '', serviceSMM: '', serviceThird: '', themeColor: 'yellow' });
-  const [file, setFile] = useState<File | null>(null);
-  const [msg, setMsg] = useState('');
-  const [plans, setPlans] = useState<any[]>([]);
+  const [settings, setSettings] = React.useState<any>({ serviceShopping: '', serviceSMM: '', serviceThird: '', themeColor: 'yellow' });
+  const [file, setFile] = React.useState<File | null>(null);
+  const [msg, setMsg] = React.useState('');
+  const [plans, setPlans] = React.useState<any[]>([]);
 
   const fetchPlans = () => {
-    fetch('/api/admin/plans', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => res.json()).then(data => setPlans(data));
+    apiFetch('/api/admin/plans', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.json()).then(data => {
+        if (Array.isArray(data)) {
+          setPlans(data);
+        } else {
+          setPlans([]);
+        }
+      }).catch(() => setPlans([]));
   };
 
-  useEffect(() => {
-    fetch('/api/settings', { headers: { Authorization: `Bearer ${token}` } })
+  React.useEffect(() => {
+    apiFetch('/api/settings', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json()).then(data => setSettings(data));
     fetchPlans();
   }, []);
 
   const handleUpdatePlatform = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch('/api/admin/settings', {
+    await apiFetch('/api/admin/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
@@ -272,7 +295,7 @@ export function AdminSettings() {
     if (!file) return;
     const form = new FormData();
     form.append('qr', file);
-    await fetch('/api/admin/qr', {
+    await apiFetch('/api/admin/qr', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form
@@ -286,7 +309,7 @@ export function AdminSettings() {
     if (!file) return;
     const form = new FormData();
     form.append('image', file);
-    const res = await fetch('/api/admin/ceo-image', {
+    const res = await apiFetch('/api/admin/ceo-image', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form
@@ -300,7 +323,7 @@ export function AdminSettings() {
   };
 
   const addPlan = async () => {
-    await fetch('/api/admin/plans', {
+    await apiFetch('/api/admin/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: 'New Plan', price: 999, duration: 'monthly', features: 'New Feature', badge: '' })
@@ -312,7 +335,7 @@ export function AdminSettings() {
     const plan = plans.find(p => p.id === id);
     if (!plan) return;
     const updated = { ...plan, [field]: value };
-    await fetch(`/api/admin/plans/${id}`, {
+    await apiFetch(`/api/admin/plans/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(updated)
@@ -321,7 +344,7 @@ export function AdminSettings() {
   };
 
   const deletePlan = async (id: number) => {
-    await fetch(`/api/admin/plans/${id}`, {
+    await apiFetch(`/api/admin/plans/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -457,7 +480,7 @@ export function AdminSettings() {
                 className="flex w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:text-white"
                 placeholder="This is a 3-in-1 platform..."
                 rows={3}
-                value={settings.websiteDescription !== undefined ? settings.websiteDescription : 'This is a 3-in-1 platform where users can shop with Cash on Delivery, grow social media (likes, followers, views), and start an online business or join Free Fire tournaments.'} 
+                value={settings.websiteDescription || 'This is a 3-in-1 platform where users can shop with Cash on Delivery, grow social media (likes, followers, views), and start an online business or join Free Fire tournaments.'} 
                 onChange={(e: any) => setSettings({...settings, websiteDescription: e.target.value})}
               />
             </div>
@@ -481,7 +504,7 @@ export function AdminSettings() {
               <label className="block text-sm font-medium mb-1">CEO Name</label>
               <Input 
                 placeholder="Shivam Nirmalkar"
-                value={settings.ceoName !== undefined ? settings.ceoName : 'Shivam Nirmalkar'} 
+                value={settings.ceoName || 'Shivam Nirmalkar'} 
                 onChange={(e: any) => setSettings({...settings, ceoName: e.target.value})}
               />
             </div>
@@ -491,7 +514,7 @@ export function AdminSettings() {
                 className="flex w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:text-white"
                 placeholder="Digital Entrepreneur..."
                 rows={2}
-                value={settings.ceoDescription !== undefined ? settings.ceoDescription : 'Digital Entrepreneur and Social Media Manager helping people grow online and start their own business.'} 
+                value={settings.ceoDescription || 'Digital Entrepreneur and Social Media Manager helping people grow online and start their own business.'} 
                 onChange={(e: any) => setSettings({...settings, ceoDescription: e.target.value})}
               />
             </div>
@@ -539,17 +562,17 @@ export function AdminSettings() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
                 <div>
                   <label className="block text-xs font-medium mb-1 text-zinc-500">Plan Name</label>
-                  <Input value={p.name} onChange={(e: any) => updatePlan(p.id, 'name', e.target.value)} className="py-2 text-sm" />
+                  <Input value={p.name || ''} onChange={(e: any) => updatePlan(p.id, 'name', e.target.value)} className="py-2 text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-zinc-500">Price (₹)</label>
-                  <Input type="number" value={p.price} onChange={(e: any) => updatePlan(p.id, 'price', parseInt(e.target.value))} className="py-2 text-sm" />
+                  <Input type="number" value={p.price || 0} onChange={(e: any) => updatePlan(p.id, 'price', parseInt(e.target.value) || 0)} className="py-2 text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-zinc-500">Duration</label>
                   <select 
                     className="w-full px-4 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all text-zinc-800 dark:text-white"
-                    value={p.duration} 
+                    value={p.duration || 'monthly'} 
                     onChange={(e: any) => updatePlan(p.id, 'duration', e.target.value)}
                   >
                     <option value="monthly">Monthly</option>
@@ -558,11 +581,11 @@ export function AdminSettings() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1 text-zinc-500">Badge (Optional)</label>
-                  <Input value={p.badge} onChange={(e: any) => updatePlan(p.id, 'badge', e.target.value)} className="py-2 text-sm" placeholder="e.g. POPULAR" />
+                  <Input value={p.badge || ''} onChange={(e: any) => updatePlan(p.id, 'badge', e.target.value)} className="py-2 text-sm" placeholder="e.g. POPULAR" />
                 </div>
                 <div className="col-span-2 md:col-span-4">
                   <label className="block text-xs font-medium mb-1 text-zinc-500">Features (Pipe | separated)</label>
-                  <Input value={p.features} onChange={(e: any) => updatePlan(p.id, 'features', e.target.value)} className="py-2 text-sm" />
+                  <Input value={p.features || ''} onChange={(e: any) => updatePlan(p.id, 'features', e.target.value)} className="py-2 text-sm" />
                 </div>
               </div>
               <div className="flex items-center">

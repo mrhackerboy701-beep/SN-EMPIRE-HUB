@@ -1,21 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
+import * as React from 'react';
 import { GlassCard, Button, Input } from '../components/ui';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../lib/store';
 import { Mail, Lock, User, AlertCircle, Phone, UserCheck } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<any>({});
-  const { login } = useAuthStore();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    fetch('/api/public-settings').then(res => res.json()).then(data => {
-      setSettings(data);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [settings, setSettings] = React.useState<any>({});
+  const { user } = useAuthStore();
+  
+  React.useEffect(() => {
+    getDoc(doc(db, 'settings', 'public')).then(snap => {
+      if(snap.exists()) setSettings(snap.data());
     }).catch(console.error);
   }, []);
 
@@ -24,22 +27,17 @@ export function Login() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      
-      login(data.token, data.user);
-      navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  if (user) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-transparent p-4 relative overflow-hidden">
@@ -64,7 +62,7 @@ export function Login() {
             </div>
           )}
           <h2 className="text-3xl font-bold mb-2">Welcome back</h2>
-          <p className="text-zinc-500">Sign in to your account to continue</p>
+          <p className="text-zinc-500">Sign in to your account with Email</p>
         </div>
 
         {error && (
@@ -77,7 +75,7 @@ export function Login() {
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 ml-1">Email Address</label>
-            <div className="relative border-zinc-200 focus-within:border-yellow-500 rounded-xl">
+            <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                 <Mail className="w-5 h-5" />
               </div>
@@ -96,10 +94,10 @@ export function Login() {
             <div className="flex items-center justify-between mb-1.5 px-1">
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</label>
               <a 
-                href="https://wa.me/919516862495?text=Hi,%20I%20have%20forgotten%20my%20password.%20Can%20you%20help%20me%20recover%20it?" 
+                href="https://wa.me/919516862495?text=Hello%21%20I%20forgot%20my%20password.%20Please%20help%20me%20recover%20it." 
                 target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                rel="noreferrer"
+                className="text-xs font-medium text-yellow-600 hover:text-yellow-500"
               >
                 Forgot Password?
               </a>
@@ -133,18 +131,18 @@ export function Login() {
 }
 
 export function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<any>({});
-  const navigate = useNavigate();
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [mobile, setMobile] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [settings, setSettings] = React.useState<any>({});
+  const { user } = useAuthStore();
 
-  useEffect(() => {
-    fetch('/api/public-settings').then(res => res.json()).then(data => {
-      setSettings(data);
+  React.useEffect(() => {
+    getDoc(doc(db, 'settings', 'public')).then(snap => {
+      if(snap.exists()) setSettings(snap.data());
     }).catch(console.error);
   }, []);
 
@@ -153,29 +151,31 @@ export function Register() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, mobile })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: name });
       
-      // Auto login after test
-      const loginRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const userRef = doc(db, 'users', cred.user.uid);
+      await setDoc(userRef, {
+        name,
+        email,
+        mobile,
+        role: email === 'shivamnirmalkar26@gmail.com' ? 'admin' : 'user',
+        status: 'active',
+        subscriptionStatus: 'inactive',
+        totalPaid: 0,
+        walletBalance: 0,
+        joinDate: serverTimestamp()
       });
-      const loginData = await loginRes.json();
-      useAuthStore.getState().login(loginData.token, loginData.user);
-      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+  
+  if (user) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-transparent p-4 relative overflow-hidden">
@@ -213,7 +213,7 @@ export function Register() {
         <form onSubmit={handleRegister} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 ml-1">Full Name</label>
-            <div className="relative">
+            <div className="relative border-zinc-200 focus-within:border-yellow-500 rounded-xl">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                 <User className="w-5 h-5" />
               </div>
@@ -229,7 +229,7 @@ export function Register() {
 
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 ml-1">Email Address</label>
-            <div className="relative">
+            <div className="relative border-zinc-200 focus-within:border-yellow-500 rounded-xl">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                 <Mail className="w-5 h-5" />
               </div>
@@ -246,7 +246,7 @@ export function Register() {
 
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 ml-1">Mobile Number</label>
-            <div className="relative">
+            <div className="relative border-zinc-200 focus-within:border-yellow-500 rounded-xl">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                 <Phone className="w-5 h-5" />
               </div>
@@ -263,7 +263,7 @@ export function Register() {
 
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 ml-1">Password</label>
-            <div className="relative">
+            <div className="relative border-zinc-200 focus-within:border-yellow-500 rounded-xl">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-400">
                 <Lock className="w-5 h-5" />
               </div>

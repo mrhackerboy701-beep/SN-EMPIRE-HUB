@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import * as React from 'react';
+import { apiFetch } from '../lib/api';
 import { GlassCard, Button } from '../components/ui';
 import { Compass, UserCheck, TrendingUp, ShoppingBag, Gamepad2, ArrowRight, Sun, Moon, Users, ShoppingCart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 // A simple count-up component
 function AnimatedCounter({ endValue, duration = 2 }: { endValue: string, duration?: number }) {
-  const [count, setCount] = useState(0);
+  const [count, setCount] = React.useState(0);
   const target = parseInt(endValue.replace(/\D/g,'')) || 0;
   const suffix = endValue.replace(/[0-9]/g, '');
 
-  useEffect(() => {
+  React.useEffect(() => {
     if(!target) return;
     let start = 0;
     const increment = target / (duration * 60);
@@ -32,16 +33,16 @@ function AnimatedCounter({ endValue, duration = 2 }: { endValue: string, duratio
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState<any>({});
-  const [themeMode, setThemeMode] = useState(localStorage.getItem('themeMode') || 'dark');
+  const [settings, setSettings] = React.useState<any>({});
+  const [themeMode, setThemeMode] = React.useState(localStorage.getItem('themeMode') || 'dark');
 
-  useEffect(() => {
-    fetch('/api/public-settings').then(res => res.json()).then(data => {
+  React.useEffect(() => {
+    apiFetch('/api/public-settings').then(res => res.json()).then(data => {
       setSettings(data);
     }).catch(console.error);
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
